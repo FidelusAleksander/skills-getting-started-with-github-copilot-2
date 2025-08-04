@@ -1,0 +1,66 @@
+name: Comment with hint
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+jobs:
+  command:
+    name: Issue Command
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get active step workflow
+        id: step-info
+        uses: skills/exercise-toolkit/actions/active-step-workflow@get-current-step-action
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read exercise config
+        id: exercise-config
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq eval -o=json '.github/skills/config.yml'
+
+      - uses: github/command@v2.0.1
+        id: hint-command
+        with:
+          command: ".hint"
+          allowed_contexts: issue
+          reaction: "eyes"
+
+      - name: Comment with hint
+        if: ${{ steps.hint-command.outputs.continue == 'true' }}
+        uses: GrantBirki/comment@v2.1.1
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          file: ${{ fromJson(steps.exercise-config.outputs.result).steps[steps.step-info.outputs.current-step].hintFile }}
+
+      - uses: github/command@v2.0.1
+        id: title-command
+        with:
+          command: ".title"
+          allowed_contexts: issue
+          reaction: "eyes"
+
+      - name: Comment with title
+        if: ${{ steps.title-command.outputs.continue == 'true' }}
+        uses: GrantBirki/comment@v2.1.1
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          repository: ${{ github.event.repository.full_name }}
+          body: |
+            ## The Title of the Exercise 
+
+            ${{ fromJson(steps.exercise-config.outputs.result).exercise.title }}
+
+            _Loaded from .github/skills/config.yml_
+
+         
